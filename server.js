@@ -24,7 +24,7 @@ app.post('/transcribe', async (req, res) => {
 
     try {
       const fileStream = fs.createReadStream(outputPath);
-      const response = await axios.post('https://api.deepgram.com/v1/listen?topics=true&smart_format=true&paragraphs=true&language=en&model=base', fileStream, {
+      const response = await axios.post('https://api.deepgram.com/v1/listen?&paragraphs=true&language=en&model=base', fileStream, {
         headers: {
           'Authorization': 'Token 1f7cebcde4a5f35d30458e63cff13b0f141d5456',
           'Content-Type': 'audio/mpeg',
