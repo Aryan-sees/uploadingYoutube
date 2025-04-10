@@ -1,9 +1,9 @@
-import express from 'express';
-import multer from 'multer';
-import fs from 'fs';
-import axios from 'axios';
-import { execSync } from 'child_process';
-import { config } from 'dotenv';
+const express = require('express');
+const multer = require('multer');
+const fs = require('fs');
+const axios = require('axios');
+const { execSync } = require('child_process');
+require('dotenv').config();
 config();
 
 const app = express();
