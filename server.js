@@ -9,7 +9,7 @@ require('dotenv').config();
 const app = express();
 const upload = multer({ dest: '/tmp' });
 
-app.post('/transcribe', upload.single('file'), async (req, res) => {
+app.post('/transcribe', upload.single('data'), async (req, res) => {
   try {
     const filePath = req.file.path;
     const audioPath = `${filePath}.mp3`;
