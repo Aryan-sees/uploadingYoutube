@@ -1,44 +1,44 @@
-// server.js - YouTube to MP3 to Deepgram transcript
-const express = require('express');
-const { exec } = require('child_process');
-const { tmpdir } = require('os');
-const { join } = require('path');
-const fs = require('fs');
-const axios = require('axios');
+import express from 'express';
+import multer from 'multer';
+import fs from 'fs';
+import axios from 'axios';
+import { execSync } from 'child_process';
+import { config } from 'dotenv';
+config();
 
 const app = express();
-app.use(express.json());
+const upload = multer({ dest: '/tmp' });
 
-app.post('/transcribe', async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).send("Missing YouTube URL");
+app.post('/transcribe', upload.single('file'), async (req, res) => {
+  try {
+    const filePath = req.file.path;
+    const audioPath = `${filePath}.mp3`;
 
-  const outputPath = join(tmpdir(), `clip-${Date.now()}.mp3`);
-  const cmd = `yt-dlp -x --audio-format mp3 -o "${outputPath}" "${url}"`;
+    console.log("🔊 Extracting audio from MP4...");
+    execSync(`ffmpeg -y -i ${filePath} -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k ${audioPath}`);
 
-  exec(cmd, async (err) => {
-    if (err) {
-      console.error('yt-dlp error:', err);
-      return res.status(500).send("yt-dlp failed");
-    }
-
-    try {
-      const fileStream = fs.createReadStream(outputPath);
-      const response = await axios.post('https://api.deepgram.com/v1/listen?&paragraphs=true&language=en&model=base', fileStream, {
+    console.log("🎙️ Sending to Deepgram...");
+    const fileStream = fs.createReadStream(audioPath);
+    const response = await axios.post(
+      'https://api.deepgram.com/v1/listen?topics=true&smart_format=true&paragraphs=true&language=en&model=base',
+      fileStream,
+      {
         headers: {
-          'Authorization': 'Token 1f7cebcde4a5f35d30458e63cff13b0f141d5456',
+          'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
           'Content-Type': 'audio/mpeg',
-        }
-      });
+        },
+      }
+    );
 
-      fs.unlinkSync(outputPath);
-      res.json(response.data);
-    } catch (e) {
-      console.error('Deepgram error:', e);
-      res.status(500).send("Deepgram API failed");
-    }
-  });
+    fs.unlinkSync(filePath);
+    fs.unlinkSync(audioPath);
+    res.json(response.data);
+
+  } catch (err) {
+    console.error("❌ Error:", err.response?.data || err.message);
+    res.status(500).send("Transcription failed");
+  }
 });
 
-const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
