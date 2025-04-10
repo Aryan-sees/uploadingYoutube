@@ -4,7 +4,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { execSync } = require('child_process');
 require('dotenv').config();
-config();
+
 
 const app = express();
 const upload = multer({ dest: '/tmp' });
