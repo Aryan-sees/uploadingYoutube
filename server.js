@@ -1,28 +1,39 @@
 const express = require('express');
-const multer = require('multer');
 const fs = require('fs');
 const axios = require('axios');
 const { execSync } = require('child_process');
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
 const app = express();
-const upload = multer({ dest: '/tmp' });
+app.use(express.json());
 
-app.post('/transcribe', upload.single('data'), async (req, res) => {
+app.post('/transcribe', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).send("Missing 'url' in request body");
+
+  const tempId = uuidv4();
+  const videoPath = `/tmp/video-${tempId}.mp4`;
+  const audioPath = `/tmp/audio-${tempId}.mp3`;
+
   try {
-    if (!req.file) return res.status(400).send("No file received");
+    console.log("⬇️ Downloading video from Drive...");
+    const response = await axios.get(url, { responseType: 'stream' });
+    const writer = fs.createWriteStream(videoPath);
+    await new Promise((resolve, reject) => {
+      response.data.pipe(writer);
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
 
-    const filePath = req.file.path;
-    const audioPath = `${filePath}.mp3`;
-
-    console.log("🔊 Extracting audio from MP4...");
-    execSync(`ffmpeg -y -i ${filePath} -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k ${audioPath}`);
+    console.log("🎧 Extracting MP3 from video...");
+    execSync(`ffmpeg -y -i ${videoPath} -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k ${audioPath}`);
 
     console.log("🧠 Sending to Deepgram...");
-    const fileStream = fs.createReadStream(audioPath);
-    const response = await axios.post(
+    const audioStream = fs.createReadStream(audioPath);
+    const dgResponse = await axios.post(
       'https://api.deepgram.com/v1/listen?topics=true&smart_format=true&paragraphs=true&language=en&model=base',
-      fileStream,
+      audioStream,
       {
         headers: {
           'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
@@ -31,15 +42,13 @@ app.post('/transcribe', upload.single('data'), async (req, res) => {
       }
     );
 
-    // Clean up temp files
-    fs.unlinkSync(filePath);
+    fs.unlinkSync(videoPath);
     fs.unlinkSync(audioPath);
-
-    res.json(response.data);
+    res.json(dgResponse.data);
 
   } catch (err) {
     console.error("❌ Error:", err.response?.data || err.message);
-    res.status(500).send("Transcription failed");
+    res.status(500).send("Deepgram or ffmpeg failed");
   }
 });
 
