@@ -5,19 +5,20 @@ const axios = require('axios');
 const { execSync } = require('child_process');
 require('dotenv').config();
 
-
 const app = express();
 const upload = multer({ dest: '/tmp' });
 
 app.post('/transcribe', upload.single('data'), async (req, res) => {
   try {
+    if (!req.file) return res.status(400).send("No file received");
+
     const filePath = req.file.path;
     const audioPath = `${filePath}.mp3`;
 
     console.log("🔊 Extracting audio from MP4...");
     execSync(`ffmpeg -y -i ${filePath} -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k ${audioPath}`);
 
-    console.log("🎙️ Sending to Deepgram...");
+    console.log("🧠 Sending to Deepgram...");
     const fileStream = fs.createReadStream(audioPath);
     const response = await axios.post(
       'https://api.deepgram.com/v1/listen?topics=true&smart_format=true&paragraphs=true&language=en&model=base',
@@ -30,8 +31,10 @@ app.post('/transcribe', upload.single('data'), async (req, res) => {
       }
     );
 
+    // Clean up temp files
     fs.unlinkSync(filePath);
     fs.unlinkSync(audioPath);
+
     res.json(response.data);
 
   } catch (err) {
