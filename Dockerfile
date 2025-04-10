@@ -1,16 +1,23 @@
-FROM node:18
+# Use a Node base image with ffmpeg preinstalled
+FROM jrottenberg/ffmpeg:4.4-alpine as ffmpeg
 
-# Install ffmpeg
-RUN apt-get update && apt-get install -y ffmpeg
+FROM node:18-alpine
 
-# App setup
+# Install ffmpeg from previous stage
+COPY --from=ffmpeg /usr/bin/ffmpeg /usr/bin/ffmpeg
+
+# Set working directory
 WORKDIR /app
+
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm install
+
+# Copy rest of the application
 COPY . .
 
-# Environment & port
-ENV PORT=8080
+# Expose port
 EXPOSE 8080
 
-CMD ["npm", "start"]
+# Start the server
+CMD ["node", "server.js"]
