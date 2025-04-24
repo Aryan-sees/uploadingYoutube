@@ -32,7 +32,7 @@ app.post('/transcribe', async (req, res) => {
     console.log("🧠 Sending to Deepgram...");
     const audioStream = fs.createReadStream(audioPath);
     const dgResponse = await axios.post(
-   "https://api.deepgram.com/v1/listen?topics=true&smart_format=true&paragraphs=true&detect_language=true&model=base",
+   "https://api.deepgram.com/v1/listen?paragraphs=true&detect_language=true&model=whisper",
       audioStream,
       {
         headers: {
